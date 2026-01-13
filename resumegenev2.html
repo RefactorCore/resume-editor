@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harvard Style Resume - Print Fixed</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&display=swap');
+
+        /* --- EDITOR STYLES --- */
+        body {
+            background-color: #e5e7eb;
+        }
+
+        /* --- RESUME PAGE STYLES --- */
+        .preview-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 0;
+            gap: 20px;
+        }
+
+        .resume-page {
+            font-family: 'Times New Roman', Times, serif;
+            width: 210mm;
+            height: 297mm; /* Fixed A4 Height for Screen View */
+            padding: 15mm 20mm;
+            background: white;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            color: #000;
+            line-height: 1.25;
+            font-size: 11pt;
+            position: relative;
+            overflow: hidden; /* Important for pagination logic on screen */
+            box-sizing: border-box;
+        }
+
+        .page-content {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- RESUME CONTENT STYLES --- */
+        .resume-header { text-align: center; margin-bottom: 12pt; }
+        .resume-name { font-size: 20pt; text-transform: uppercase; font-weight: bold; margin-bottom: 6pt; letter-spacing: 0.5px; }
+        .contact-info { font-size: 10pt; margin-bottom: 4pt; }
+        .section-title { font-size: 12pt; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #000; margin-top: 10pt; margin-bottom: 6pt; padding-bottom: 2pt; }
+        .entry-item { margin-bottom: 8pt; }
+        .entry-header { display: flex; justify-content: space-between; font-weight: bold; }
+        .entry-sub { display: flex; justify-content: space-between; font-style: italic; margin-bottom: 2pt; }
+        .entry-content ul { list-style-type: disc; margin-left: 14pt; padding-left: 0; margin-top: 2pt; margin-bottom: 0; }
+        .entry-content li { margin-bottom: 2pt; }
+
+        /* Profile Pic */
+        .profile-pic-container {
+            display: none; 
+            position: absolute;
+            top: 5mm;
+            right: 20mm;
+            width: 30mm;
+            height: 40mm;
+            object-fit: cover;
+            border: 1px solid #ccc;
+            z-index: 50;
+        }
+
+        /* --- CRITICAL PRINT FIXES --- */
+        @media print {
+            /* 1. Reset Global Layout */
+            body, html {
+                margin: 0 !important;
+                padding: 0 !important;
+                height: auto !important;
+                width: auto !important;
+                overflow: visible !important;
+                background: white !important;
+            }
+
+            /* 2. Hide Everything Else */
+            #editorPanel, #showEditorBtn, .no-print, nav, header, footer {
+                display: none !important;
+            }
+
+            /* 3. Force Preview Panel to be a standard block */
+            #previewPanel {
+                display: block !important;
+                position: static !important;
+                width: 100% !important;
+                height: auto !important;
+                overflow: visible !important;
+                background: white !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: none !important;
+            }
+
+            /* 4. Fix Container */
+            #previewContainer {
+                display: block !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                gap: 0 !important;
+                background: white !important;
+            }
+
+            /* 5. Fix The Page Itself */
+            .resume-page {
+                margin: 0 auto !important;
+                padding: 15mm 20mm !important; /* Keep internal padding */
+                box-shadow: none !important;
+                border: none !important;
+                width: 210mm !important; /* Force A4 width */
+                height: auto !important; /* Allow height to flex if needed, or keep 297mm */
+                min-height: 297mm !important;
+                overflow: visible !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                display: block !important;
+                position: relative !important;
+                left: 0 !important;
+                top: 0 !important;
+            }
+
+            /* Remove break from last page */
+            .resume-page:last-child {
+                page-break-after: auto !important;
+                break-after: auto !important;
+            }
+
+            /* 6. Page Setup */
+            @page {
+                size: A4;
+                margin: 0; /* We handle margins in .resume-page padding */
+            }
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden text-gray-800 relative">
+
+    <!-- FLOATING SHOW EDITOR BUTTON -->
+    <button id="showEditorBtn" onclick="toggleSidebar()" class="hidden fixed bottom-8 left-8 z-50 bg-blue-900 text-white w-14 h-14 rounded-full shadow-2xl hover:bg-blue-800 transition-all transform hover:scale-110 flex items-center justify-center no-print" title="Edit Resume">
+        <i class="fas fa-pen fa-lg"></i>
+    </button>
+
+    <!-- LEFT PANEL: EDITOR -->
+    <div id="editorPanel" class="w-1/3 h-full overflow-y-auto bg-white border-r border-gray-300 p-6 no-print shadow-xl z-20 flex flex-col transition-all duration-300 ease-in-out">
+        <div class="flex justify-between items-center mb-6 sticky top-0 bg-white pt-2 pb-4 border-b z-10">
+            <h1 class="text-2xl font-bold text-gray-900">Resume Editor</h1>
+            <div class="flex gap-2">
+                <button onclick="toggleSidebar()" class="text-gray-500 hover:text-gray-700 px-3 py-2 rounded hover:bg-gray-100 transition-colors" title="Hide Editor">
+                    <i class="fas fa-chevron-left"></i> Hide
+                </button>
+                <button onclick="saveResume()" class="bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded shadow flex items-center gap-2 transition-colors" title="Save Resume">
+                    <i class="fas fa-save"></i> Save
+                </button>
+                <button onclick="loadSavedResume()" class="bg-yellow-700 hover:bg-yellow-600 text-white px-3 py-2 rounded shadow flex items-center gap-2 transition-colors" title="Load Saved Resume">
+                    <i class="fas fa-folder-open"></i> Load
+                </button>
+                <button onclick="document.getElementById('importJson').click()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-2 rounded shadow flex items-center gap-2 transition-colors" title="Import JSON">
+                    <i class="fas fa-file-import"></i> Import
+                </button>
+                <button onclick="window.print()" class="bg-blue-900 hover:bg-blue-800 text-white px-4 py-2 rounded shadow flex items-center gap-2 transition-colors">
+                    <i class="fas fa-file-pdf"></i> PDF
+                </button>
+            </div>
+        </div>
+
+        <form id="resumeForm" oninput="triggerUpdate()" class="space-y-6 pb-10">
+            <!-- Personal Info -->
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Personal Details</h2>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700">Full Name</label>
+                        <input type="text" id="fullName" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2 text-sm" value="Alexander Hamilton">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700">Phone</label>
+                            <input type="text" id="phone" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2 text-sm" value="(555) 123-4567">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700">Email</label>
+                            <input type="email" id="email" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2 text-sm" value="alex.hamilton@example.com">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700">Address / LinkedIn</label>
+                        <input type="text" id="address" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2 text-sm" value="New York, NY | linkedin.com/in/ahamilton">
+                    </div>
+                    
+                    <!-- Image Upload -->
+                    <div class="mt-2 pt-2 border-t border-gray-200">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-xs font-medium text-gray-700">Profile Picture</label>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="showPhoto" class="mr-2" onchange="togglePhoto()">
+                                <label for="showPhoto" class="text-xs text-gray-500">Show on Resume</label>
+                            </div>
+                        </div>
+                        <input type="file" id="photoInput" accept="image/*" class="text-xs text-gray-500 w-full" onchange="handlePhotoUpload(this)">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Education -->
+            <div>
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Education</h2>
+                    <button type="button" onclick="addEducation()" class="text-blue-600 text-xs hover:text-blue-800 font-medium">+ Add Education</button>
+                </div>
+                <div id="educationList" class="space-y-3"></div>
+            </div>
+
+            <!-- Experience -->
+            <div>
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Experience</h2>
+                    <button type="button" onclick="addExperience()" class="text-blue-600 text-xs hover:text-blue-800 font-medium">+ Add Experience</button>
+                </div>
+                <div id="experienceList" class="space-y-3"></div>
+            </div>
+
+            <!-- Skills -->
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Skills & Interests</h2>
+                <textarea id="skills" rows="4" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2 text-sm" placeholder="Bullet points or text...">Technical: Financial Modeling, Python, SQL, LaTeX
+Languages: English (Native), French (Fluent)
+Interests: American History, Constitutional Law, Economics, Fencing</textarea>
+            </div>
+        </form>
+    </div>
+
+    <!-- RIGHT PANEL: PREVIEW AREA -->
+    <div id="previewPanel" class="w-2/3 h-full bg-gray-600 overflow-y-auto flex flex-col items-center transition-all duration-300 ease-in-out">
+        <div id="previewContainer" class="preview-container">
+            <!-- Pages will be injected here by JS -->
+        </div>
+        <div class="h-10 no-print"></div> <!-- Bottom spacer -->
+    </div>
+
+    <!-- Hidden staging area -->
+    <div id="stagingArea" style="position: absolute; top: -9999px; left: -9999px; width: 210mm; padding: 15mm 20mm; background: white; visibility: hidden;"></div>
+
+    <!-- Hidden inputs for photo preview and import -->
+    <input type="hidden" id="previewPhotoSrc">
+    <input type="file" id="importJson" accept=".json,application/json" style="display:none" onchange="handleImport(this)">
+
+    <script>
+        // --- DATA STATE ---
+        const state = {
+            education: [
+                {
+                    school: "Harvard University",
+                    location: "Cambridge, MA",
+                    degree: "Bachelor of Arts in Economics",
+                    date: "May 2024",
+                    details: "Graduated Magna Cum Laude.\nRelevant Coursework: Microeconomics, Macroeconomics, Financial Markets."
+                }
+            ],
+            experience: [
+                {
+                    company: "Goldman Sachs",
+                    location: "New York, NY",
+                    role: "Investment Banking Analyst",
+                    date: "June 2024 - Present",
+                    details: "Conducted valuation analysis for M&A transactions worth over $500M.\nCreated detailed financial models to forecast future earnings.\nPrepared pitch books and presentation materials for client meetings."
+                },
+                {
+                    company: "The Treasury Department",
+                    location: "Washington, D.C.",
+                    role: "Summer Analyst",
+                    date: "June 2023 - August 2023",
+                    details: "Assisted in the formulation of economic policy reports.\nAnalyzed fiscal data to support debt management strategies for the federal government."
+                },
+                {
+                    company: "Local Law Firm",
+                    location: "Albany, NY",
+                    role: "Legal Intern",
+                    date: "June 2022 - August 2022",
+                    details: "Researched case law regarding property disputes.\nDrafted initial legal memorandums for senior partners."
+                }
+            ]
+        };
+
+        // --- RENDER INPUTS ---
+
+        function renderEducationInputs() {
+            const container = document.getElementById('educationList');
+            container.innerHTML = '';
+            state.education.forEach((edu, index) => {
+                container.innerHTML += `
+                    <div class="bg-white p-3 rounded border border-gray-300 shadow-sm relative group transition-all hover:border-blue-400">
+                        <button type="button" onclick="removeEducation(${index})" class="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors"><i class="fas fa-trash"></i></button>
+                        <input type="text" placeholder="University" class="block w-full text-sm font-bold bg-transparent border-b border-gray-100 mb-1 focus:outline-none focus:border-blue-500" value="${edu.school}" oninput="updateEducation(${index}, 'school', this.value)">
+                        <div class="grid grid-cols-2 gap-2 mb-1">
+                            <input type="text" placeholder="Location" class="text-xs bg-transparent border-b border-gray-100 focus:outline-none focus:border-blue-500 text-gray-600" value="${edu.location}" oninput="updateEducation(${index}, 'location', this.value)">
+                            <input type="text" placeholder="Date" class="text-xs bg-transparent border-b border-gray-100 focus:outline-none focus:border-blue-500 text-gray-600 text-right" value="${edu.date}" oninput="updateEducation(${index}, 'date', this.value)">
+                        </div>
+                        <input type="text" placeholder="Degree" class="block w-full text-xs italic bg-transparent border-b border-gray-100 mb-2 focus:outline-none focus:border-blue-500" value="${edu.degree}" oninput="updateEducation(${index}, 'degree', this.value)">
+                        <textarea placeholder="Details (Bullet points)" rows="3" class="block w-full text-xs bg-transparent border border-gray-100 rounded p-1 focus:outline-none focus:border-blue-500 resize-y" oninput="updateEducation(${index}, 'details', this.value)">${edu.details}</textarea>
+                    </div>
+                `;
+            });
+        }
+
+        function renderExperienceInputs() {
+            const container = document.getElementById('experienceList');
+            container.innerHTML = '';
+            state.experience.forEach((exp, index) => {
+                container.innerHTML += `
+                    <div class="bg-white p-3 rounded border border-gray-300 shadow-sm relative group transition-all hover:border-blue-400">
+                        <button type="button" onclick="removeExperience(${index})" class="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors"><i class="fas fa-trash"></i></button>
+                        <input type="text" placeholder="Company/Organization" class="block w-full text-sm font-bold bg-transparent border-b border-gray-100 mb-1 focus:outline-none focus:border-blue-500" value="${exp.company}" oninput="updateExperience(${index}, 'company', this.value)">
+                        <div class="grid grid-cols-2 gap-2 mb-1">
+                            <input type="text" placeholder="Location" class="text-xs bg-transparent border-b border-gray-100 focus:outline-none focus:border-blue-500 text-gray-600" value="${exp.location}" oninput="updateExperience(${index}, 'location', this.value)">
+                            <input type="text" placeholder="Date" class="text-xs bg-transparent border-b border-gray-100 focus:outline-none focus:border-blue-500 text-gray-600 text-right" value="${exp.date}" oninput="updateExperience(${index}, 'date', this.value)">
+                        </div>
+                        <input type="text" placeholder="Role/Title" class="block w-full text-xs italic bg-transparent border-b border-gray-100 mb-2 focus:outline-none focus:border-blue-500" value="${exp.role}" oninput="updateExperience(${index}, 'role', this.value)">
+                        <textarea placeholder="Details (Bullet points)" rows="3" class="block w-full text-xs bg-transparent border border-gray-100 rounded p-1 focus:outline-none focus:border-blue-500 resize-y" oninput="updateExperience(${index}, 'details', this.value)">${exp.details}</textarea>
+                    </div>
+                `;
+            });
+        }
+
+        // --- PAGE GENERATION & PAGINATION LOGIC ---
+
+        function triggerUpdate() {
+            updatePreview();
+        }
+
+        function createPageElement(pageNumber) {
+            const page = document.createElement('div');
+            page.className = 'resume-page';
+            page.id = `page-${pageNumber}`;
+            
+            // Photo Logic for Page 1
+            if (pageNumber === 1) {
+                const img = document.createElement('img');
+                img.className = 'profile-pic-container';
+                img.alt = 'Profile';
+                const src = document.getElementById('previewPhotoSrc')?.value;
+                const display = document.getElementById('showPhoto').checked ? 'block' : 'none';
+                if(src) img.src = src;
+                img.style.display = display;
+                page.appendChild(img);
+            }
+
+            const content = document.createElement('div');
+            content.className = 'page-content';
+            page.appendChild(content);
+            return { pageWrapper: page, contentArea: content };
+        }
+
+        function getHeaderHTML() {
+            const name = document.getElementById('fullName').value;
+            const address = document.getElementById('address').value;
+            const phone = document.getElementById('phone').value;
+            const email = document.getElementById('email').value;
+            const hasPhoto = document.getElementById('showPhoto').checked;
+            const style = hasPhoto ? 'text-align: left; padding-right: 35mm;' : 'text-align: center;';
+
+            return `
+                <div class="resume-header" style="${style}">
+                    <div class="resume-name">${name}</div>
+                    <div class="contact-info">${address} | ${phone} | ${email}</div>
+                </div>
+            `;
+        }
+
+        function getSectionTitleHTML(title) {
+            return `<div class="section-title">${title}</div>`;
+        }
+
+        function getEntryHTML(title, loc, sub, date, details) {
+            const bullets = details.split('\n').filter(line => line.trim() !== '').map(line => `<li>${line}</li>`).join('');
+            return `
+                <div class="entry-item">
+                    <div class="entry-header"><span>${title}</span><span>${loc}</span></div>
+                    <div class="entry-sub"><span>${sub}</span><span>${date}</span></div>
+                    <div class="entry-content">${bullets ? `<ul>${bullets}</ul>` : ''}</div>
+                </div>
+            `;
+        }
+
+        function updatePreview() {
+            const previewContainer = document.getElementById('previewContainer');
+            previewContainer.innerHTML = '';
+
+            const blocks = [];
+            const toNode = (html) => {
+                const div = document.createElement('div');
+                div.innerHTML = html.trim();
+                return div.firstChild; 
+            };
+
+            blocks.push({ type: 'header', node: toNode(getHeaderHTML()) });
+
+            if (state.education.length > 0) {
+                blocks.push({ type: 'title', node: toNode(getSectionTitleHTML('Education')) });
+                state.education.forEach(edu => {
+                    blocks.push({ type: 'entry', node: toNode(getEntryHTML(edu.school, edu.location, edu.degree, edu.date, edu.details)) });
+                });
+            }
+
+            if (state.experience.length > 0) {
+                blocks.push({ type: 'title', node: toNode(getSectionTitleHTML('Experience')) });
+                state.experience.forEach(exp => {
+                    blocks.push({ type: 'entry', node: toNode(getEntryHTML(exp.company, exp.location, exp.role, exp.date, exp.details)) });
+                });
+            }
+
+            const skillsVal = document.getElementById('skills').value;
+            if (skillsVal.trim()) {
+                blocks.push({ type: 'title', node: toNode(getSectionTitleHTML('Skills & Interests')) });
+                const skillsDiv = document.createElement('div');
+                skillsDiv.className = 'entry-content';
+                skillsDiv.style.whiteSpace = 'pre-line';
+                skillsDiv.innerText = skillsVal;
+                blocks.push({ type: 'entry', node: skillsDiv });
+            }
+
+            let pageNum = 1;
+            let currentPage = createPageElement(pageNum);
+            previewContainer.appendChild(currentPage.pageWrapper);
+            
+            // Standard A4 inner height limit (approx)
+            // We use clientHeight to be safe, but fallback to reasonable px value
+            const MAX_HEIGHT = 1000; 
+
+            blocks.forEach((block, index) => {
+                const node = block.node;
+                currentPage.contentArea.appendChild(node);
+                
+                const currentContentHeight = currentPage.contentArea.scrollHeight;
+                const pageLimit = currentPage.contentArea.clientHeight || MAX_HEIGHT;
+
+                // Check for overflow with a small buffer
+                if (currentContentHeight > pageLimit) {
+                    currentPage.contentArea.removeChild(node);
+                    
+                    let movedTitle = false;
+                    // Orphan handling: if previous block was title, move it too
+                    if (block.type === 'entry' && index > 0 && blocks[index-1].type === 'title') {
+                        const lastChild = currentPage.contentArea.lastElementChild;
+                        if (lastChild && lastChild.classList.contains('section-title')) {
+                            currentPage.contentArea.removeChild(lastChild);
+                            movedTitle = true;
+                        }
+                    }
+
+                    pageNum++;
+                    currentPage = createPageElement(pageNum);
+                    previewContainer.appendChild(currentPage.pageWrapper);
+                    
+                    if (movedTitle) {
+                         const titleNode = blocks[index-1].node.cloneNode(true);
+                         currentPage.contentArea.appendChild(titleNode);
+                    }
+                    currentPage.contentArea.appendChild(node);
+                }
+            });
+        }
+
+        // --- INTERACTION HANDLERS ---
+        function addEducation() {
+            state.education.push({ school: "", location: "", degree: "", date: "", details: "" });
+            renderEducationInputs();
+            triggerUpdate();
+        }
+
+        function removeEducation(index) {
+            state.education.splice(index, 1);
+            renderEducationInputs();
+            triggerUpdate();
+        }
+
+        function updateEducation(index, field, value) {
+            state.education[index][field] = value;
+            triggerUpdate();
+        }
+
+        function addExperience() {
+            state.experience.push({ company: "", location: "", role: "", date: "", details: "" });
+            renderExperienceInputs();
+            triggerUpdate();
+        }
+
+        function removeExperience(index) {
+            state.experience.splice(index, 1);
+            renderExperienceInputs();
+            triggerUpdate();
+        }
+
+        function updateExperience(index, field, value) {
+            state.experience[index][field] = value;
+            triggerUpdate();
+        }
+
+        // --- SIDEBAR TOGGLE ---
+        function toggleSidebar() {
+            const editor = document.getElementById('editorPanel');
+            const preview = document.getElementById('previewPanel');
+            const showBtn = document.getElementById('showEditorBtn');
+            
+            if (editor.classList.contains('hidden')) {
+                editor.classList.remove('hidden');
+                preview.classList.remove('w-full');
+                preview.classList.add('w-2/3');
+                showBtn.classList.add('hidden');
+            } else {
+                editor.classList.add('hidden');
+                preview.classList.remove('w-2/3');
+                preview.classList.add('w-full');
+                showBtn.classList.remove('hidden');
+            }
+        }
+
+        // --- PHOTO HANDLING ---
+        const hiddenSrc = document.getElementById('previewPhotoSrc') || (function(){ const h = document.createElement('input'); h.type='hidden'; h.id='previewPhotoSrc'; document.body.appendChild(h); return h; })();
+
+        function handlePhotoUpload(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('previewPhotoSrc').value = e.target.result;
+                    document.getElementById('showPhoto').checked = true;
+                    triggerUpdate();
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function togglePhoto() {
+            triggerUpdate();
+        }
+
+        // --- SAVE / LOAD / IMPORT FUNCTIONS ---
+        function collectStateForSave() {
+            return {
+                fullName: document.getElementById('fullName').value,
+                phone: document.getElementById('phone').value,
+                email: document.getElementById('email').value,
+                address: document.getElementById('address').value,
+                showPhoto: document.getElementById('showPhoto').checked,
+                photoSrc: document.getElementById('previewPhotoSrc').value || '',
+                skills: document.getElementById('skills').value,
+                education: state.education,
+                experience: state.experience,
+                savedAt: new Date().toISOString()
+            };
+        }
+
+        function downloadResumeJSON(data) {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const name = (data.fullName && data.fullName.trim()) ? data.fullName.trim().replace(/\s+/g, '_') : 'resume';
+            a.download = `${name}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function saveResume() {
+            try {
+                const data = collectStateForSave();
+                localStorage.setItem('resumeGenev2', JSON.stringify(data));
+                downloadResumeJSON(data);
+                // small feedback
+                alert('Resume saved to localStorage and downloaded as JSON.');
+            } catch (err) {
+                console.error(err);
+                alert('Failed to save resume: ' + err.message);
+            }
+        }
+
+        function loadSavedResume() {
+            try {
+                const raw = localStorage.getItem('resumeGenev2');
+                if (!raw) {
+                    alert('No saved resume found in localStorage.');
+                    return;
+                }
+                const data = JSON.parse(raw);
+                applyLoadedData(data);
+                alert('Loaded resume from localStorage.');
+            } catch (err) {
+                console.error(err);
+                alert('Failed to load resume: ' + err.message);
+            }
+        }
+
+        function handleImport(input) {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    applyLoadedData(data);
+                    // persist to localStorage as well
+                    localStorage.setItem('resumeGenev2', JSON.stringify(data));
+                    alert('Imported resume and saved to localStorage.');
+                } catch (err) {
+                    console.error(err);
+                    alert('Invalid JSON file. Could not import.');
+                } finally {
+                    input.value = ''; // reset
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function applyLoadedData(data) {
+            document.getElementById('fullName').value = data.fullName || '';
+            document.getElementById('phone').value = data.phone || '';
+            document.getElementById('email').value = data.email || '';
+            document.getElementById('address').value = data.address || '';
+            document.getElementById('showPhoto').checked = !!data.showPhoto;
+            document.getElementById('previewPhotoSrc').value = data.photoSrc || '';
+            document.getElementById('skills').value = data.skills || '';
+            state.education = Array.isArray(data.education) ? data.education : [];
+            state.experience = Array.isArray(data.experience) ? data.experience : [];
+            renderEducationInputs();
+            renderExperienceInputs();
+            triggerUpdate();
+        }
+
+        // --- INITIALIZATION ---
+        window.onload = function() {
+            renderEducationInputs();
+            renderExperienceInputs();
+
+            // Auto-load from localStorage if available
+            try {
+                const raw = localStorage.getItem('resumeGenev2');
+                if (raw) {
+                    const data = JSON.parse(raw);
+                    // If savedAt present, auto-load so user's last saved state returns on open
+                    if (data && data.savedAt) {
+                        applyLoadedData(data);
+                    }
+                }
+            } catch (err) {
+                console.warn('Could not auto-load saved resume:', err);
+            }
+
+            triggerUpdate();
+        };
+
+    </script>
+</body>
+</html>
